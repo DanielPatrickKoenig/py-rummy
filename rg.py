@@ -116,5 +116,3 @@ class RummyGame (CardGame):
             #         cards_for_set.append(removed_pile_card)
         if len(cards_for_set) >= self.match_min_length:
             self.sets.append({ 'cards': cards_for_set, 'player': player['name'] })
-
-

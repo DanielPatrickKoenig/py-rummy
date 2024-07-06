@@ -15,21 +15,28 @@ class RummyGame (CardGame):
 
         print('current player = ' + self.get_current_player()['name'])
 
-        pile_options = self.get_set_options(include_hand=False, include_pile=True)
-        if len(pile_options['options']) > 0:
-            # process hand sets
-            print('pile options')
-            print(pile_options['options'][0]) # iterate through options
-            # if has options add cards to hand
+        # pile_options = self.get_set_options(include_hand=False, include_pile=True)
+        # if len(pile_options['options']) > 0:
+        #     # process hand sets
+        #     print('pile options')
+        #     print(pile_options['options'][0]) # iterate through options
+        #     # if has options add cards to hand
 
-        combo_options = self.get_set_options(include_hand=True, include_pile=True)
-        if len(combo_options['options']) > 0:
-            # process hand sets
-            print('combo options')
-            print(combo_options['options'][0]) # iterate through options
-            # if has options add cards to hand
+        print('opportunities')
+        print(self.get_existing_set_opportunitie())
         
-        self.draw_card(self.get_current_player()) # only if there are no pile related options
+        combo_options = self.get_set_options(include_hand=True, include_pile=True)
+        hand_before_combo = len(self.get_current_player()['hand'])
+        print(str(hand_before_combo) + ' cards')
+        if len(combo_options['options']) > 0:
+            first_card_picked_up = self.draw_from_discard_pile(combo_options['unique_options'])
+            print('first card picked up')
+            print(first_card_picked_up)
+
+        hand_after_combo = len(self.get_current_player()['hand'])
+        print(str(hand_after_combo) + ' cards')
+        if (hand_before_combo == hand_after_combo):
+            self.draw_card(self.get_current_player()) # only if there are no pile related options
 
         hand_options = self.get_set_options()
         if len(hand_options['options']) > 0:
@@ -102,6 +109,56 @@ class RummyGame (CardGame):
                     full_list.extend(n)
         return { 'options': list(reversed(list(sorted(match_manifest, key=lambda x: x['point_totals'])))), 'unique_options': self.unique_card_list(full_list) }
     
+    def get_used_cards(self):
+        used_cards = []
+        for n in self.sets:
+            cards_in_set = map(lambda x: { 'card': x['card']['card'], 'suite': x['card']['suite'] }, n)
+            used_cards.extend(cards_in_set)
+        return used_cards
+
+    def get_existing_set_opportunitie(self):
+        match_sets = list(filter(lambda x: x[0]['card']['card'] == x[1]['card']['card'], self.sets))
+        match_opportunities = []
+        combo_list = [n for n in self.discard_pile]
+        combo_list.extend(self.get_current_player()['hand'])
+        for n in match_sets:
+            match_opp = list(filter(lambda x: x['card'] == n[0]['card']['card'], combo_list))
+            if len(match_opp) > 0:
+                match_opportunities.extend(map(lambda x: { 'card': x, 'set': n[0]['index'] } , match_opp))
+        # print('match opportunities')
+        # print(match_opportunities)
+        
+        run_sets = list(filter(lambda x: x[0]['card']['suite'] == x[1]['card']['suite'], self.sets))
+        # print('run sets')
+        # print(run_sets)
+        run_opportunities = []
+        for n in run_sets:
+            first_in_run = n[0]
+            last_in_run = n[-1]
+            values_before_first = list(reversed(list(filter(lambda x: x < first_in_run['card']['card'], self.suites))))
+            values_after_first = list(filter(lambda x: x > last_in_run['card']['card'], self.suites))
+            run_opp = []
+            for vb in values_before_first:
+                filtered_run = list(filter(lambda x: x['card'] == vb and n[0]['card']['suite'] == x['suite'], combo_list))
+                if len(filtered_run) > 0:
+                    run_opp.extend(filtered_run)
+                else:
+                    break
+            
+            for va in values_after_first:
+                filtered_run = list(filter(lambda x: x['card'] == va and n[0]['card']['suite'] == x['suite'], combo_list))
+                if len(filtered_run) > 0:
+                    run_opp.extend(filtered_run)
+                else:
+                    break
+            if len(run_opp) > 0:
+                run_opportunities.extend(map(lambda x: { 'card': x, 'set': n[0]['index'] } , run_opp))
+        # iterate forward and backward to check for run additions
+        opportunities = []
+        opportunities.extend(match_opportunities)
+        opportunities.extend(run_opportunities)
+        return opportunities
+
     def add_set(self, player, cards):
         cards_for_set = []
         for n in cards:
@@ -115,4 +172,24 @@ class RummyGame (CardGame):
             #         removed_pile_card = self.discard_pile.pop(card_in_hand['index'])
             #         cards_for_set.append(removed_pile_card)
         if len(cards_for_set) >= self.match_min_length:
-            self.sets.append({ 'cards': cards_for_set, 'player': player['name'] })
+            set_index = len(self.sets)
+            self.sets.append(list(map(lambda x: { 'card': x, 'player': player['name'], 'index': set_index } ,cards_for_set)))
+
+    def draw_from_discard_pile(self, target_cards):
+        discard_pile_with_indexes = []
+        for i, n in enumerate(self.discard_pile):
+            discard_pile_with_indexes.append({ 'card': n['card'], 'suite': n['suite'], 'index': i })
+        print('draw_from_discard_pile')
+        filtered_indexed_discard_matches = list(filter(None, [self.find_card(n, target_cards) for n in discard_pile_with_indexes]))
+        sorted_discard_matches = list(sorted(list(map(lambda x: x['index'], filtered_indexed_discard_matches))))
+        print(sorted_discard_matches)
+
+        first_card_pulled = None
+        if len(sorted_discard_matches) > 0:
+            cards_to_pickup = list(reversed(list(range(sorted_discard_matches[0], len(self.discard_pile)))))
+            for i, n in enumerate(cards_to_pickup):
+                pulled_card = self.discard_pile.pop(n)
+                if i == 0:
+                    first_card_pulled = pulled_card
+                self.get_current_player()['hand'].append(pulled_card)
+        return first_card_pulled

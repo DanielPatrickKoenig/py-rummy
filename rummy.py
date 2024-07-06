@@ -8,7 +8,7 @@ def player_turn():
         game.draw_card(game.get_current_player())
         game.discard(3)
 
-for n in range(0, 20):
+for n in range(0, 12):
     game.take_turn(player_turn)
 
 

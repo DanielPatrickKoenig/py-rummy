@@ -22,16 +22,21 @@ class RummyGame (CardGame):
         #     print(pile_options['options'][0]) # iterate through options
         #     # if has options add cards to hand
 
-        print('opportunities')
-        print(self.get_existing_set_opportunitie())
-        
+        # print('opportunities')
+        # print(self.get_existing_set_opportunitie(include_pile=True))
+
         combo_options = self.get_set_options(include_hand=True, include_pile=True)
+        combo_opps = self.get_existing_set_opportunitie(include_pile=True)
         hand_before_combo = len(self.get_current_player()['hand'])
-        print(str(hand_before_combo) + ' cards')
-        if len(combo_options['options']) > 0:
-            first_card_picked_up = self.draw_from_discard_pile(combo_options['unique_options'])
-            print('first card picked up')
-            print(first_card_picked_up)
+        first_card_picked_up = None
+        # print(str(hand_before_combo) + ' cards')
+        if len(combo_options['options']) > 0 or len(combo_opps['opps']) > 0:
+            cards_to_draw = []
+            cards_to_draw.extend(combo_options['unique_options'])
+            cards_to_draw.extend(combo_opps['opps'])
+            first_card_picked_up = self.draw_from_discard_pile(cards_to_draw)
+            # print('first card picked up')
+            # print(first_card_picked_up)
 
         hand_after_combo = len(self.get_current_player()['hand'])
         print(str(hand_after_combo) + ' cards')
@@ -39,14 +44,31 @@ class RummyGame (CardGame):
             self.draw_card(self.get_current_player()) # only if there are no pile related options
 
         hand_options = self.get_set_options()
-        if len(hand_options['options']) > 0:
+        hand_opps = self.get_existing_set_opportunitie()
+        print('hand options')
+        print(hand_options)
+        print('hand opps')
+        print(hand_opps)
+        if len(hand_options['options']) > 0 or len(hand_opps['opps']):
+            if first_card_picked_up:
+                options_with_fcpu = list(map(lambda x: len(list(filter(lambda y: y['card'] == first_card_picked_up['card'] and y['suite'] == first_card_picked_up['suite'] ,x['cards']))) > 0 ,hand_options['options']))
+                if len(list(filter(lambda x: x ,options_with_fcpu))) > 0:
+                    print('options with fcpu')
+                    print(options_with_fcpu)
+                    # flag first set
+                else:
+                    opps_with_fcpu = list(map(lambda x: x['card']['card'] == first_card_picked_up['card'] and x['card']['suite'] == first_card_picked_up['suite'] ,hand_opps['opps']))
+                    if len(list(filter(lambda x: x ,opps_with_fcpu))) > 0:
+                        print('opps with fcpu')
+                        print(opps_with_fcpu)
+                        # flag first opp
             # process hand sets
             for i, n in enumerate(hand_options['options']):
                 self.add_set(self.get_current_player(), hand_options['options'][i]['cards'])
             print('sets')
             print(self.sets)
 
-        self.discard(0)
+        self.discard(0) # create logit to choose card to discard
     
     def discard(self, card_index):
         card_to_discard = self.get_current_player()['hand'].pop(card_index)
@@ -116,11 +138,12 @@ class RummyGame (CardGame):
             used_cards.extend(cards_in_set)
         return used_cards
 
-    def get_existing_set_opportunitie(self):
+    def get_existing_set_opportunitie(self, include_pile=False):
         match_sets = list(filter(lambda x: x[0]['card']['card'] == x[1]['card']['card'], self.sets))
         match_opportunities = []
-        combo_list = [n for n in self.discard_pile]
-        combo_list.extend(self.get_current_player()['hand'])
+        combo_list = [n for n in self.get_current_player()['hand']]
+        if include_pile:
+            combo_list.extend(self.discard_pile)
         for n in match_sets:
             match_opp = list(filter(lambda x: x['card'] == n[0]['card']['card'], combo_list))
             if len(match_opp) > 0:
@@ -157,7 +180,8 @@ class RummyGame (CardGame):
         opportunities = []
         opportunities.extend(match_opportunities)
         opportunities.extend(run_opportunities)
-        return opportunities
+        cards_in_opp = list(map(lambda x: x['card'], opportunities))
+        return { 'opps': opportunities, 'uniqe_opps': self.unique_card_list(cards_in_opp) }
 
     def add_set(self, player, cards):
         cards_for_set = []

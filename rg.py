@@ -49,30 +49,74 @@ class RummyGame (CardGame):
         print(hand_options)
         print('hand opps')
         print(hand_opps)
+        fcpu_options = []
+        fcpu_opps = []
         if len(hand_options['options']) > 0 or len(hand_opps['opps']):
             if first_card_picked_up:
                 options_with_fcpu = list(map(lambda x: len(list(filter(lambda y: y['card'] == first_card_picked_up['card'] and y['suite'] == first_card_picked_up['suite'] ,x['cards']))) > 0 ,hand_options['options']))
                 if len(list(filter(lambda x: x ,options_with_fcpu))) > 0:
                     print('options with fcpu')
                     print(options_with_fcpu)
+                    for i, n in enumerate(options_with_fcpu):
+                        if n:
+                            fcpu_options.append(hand_options['options'][i])
+                    fcpu_options = list(reversed(list(sorted(fcpu_options, key=lambda x: x['point_totals']))))
+                    print('fcpu options')
+                    print(fcpu_options)
                     # flag first set
                 else:
                     opps_with_fcpu = list(map(lambda x: x['card']['card'] == first_card_picked_up['card'] and x['card']['suite'] == first_card_picked_up['suite'] ,hand_opps['opps']))
                     if len(list(filter(lambda x: x ,opps_with_fcpu))) > 0:
                         print('opps with fcpu')
                         print(opps_with_fcpu)
+                        for i, n in enumerate(opps_with_fcpu):
+                            if n:
+                                fcpu_options.append(hand_opps['opps'][i])
+                        fcpu_opps = list(reversed(list(sorted(fcpu_opps, key=lambda x: x['point_totals']))))
+                        print('fcpu opps')
+                        print(fcpu_opps)
                         # flag first opp
             # process hand sets
+            if len(fcpu_options) > 0:
+                self.add_set(self.get_current_player(), fcpu_options[0]['cards'])
+            
+            if len(fcpu_opps) > 0:
+                self.add_card_to_set(fcpu_opps[0]['card'], fcpu_opps[0]['set'])
+            
             for i, n in enumerate(hand_options['options']):
                 self.add_set(self.get_current_player(), hand_options['options'][i]['cards'])
+            
+            for i, n in enumerate(hand_opps['opps']):
+                self.add_card_to_set(n['card'], n['set'])
             print('sets')
             print(self.sets)
 
-        self.discard(0) # create logit to choose card to discard
+        self.discard() # create logit to choose card to discard
     
-    def discard(self, card_index):
-        card_to_discard = self.get_current_player()['hand'].pop(card_index)
-        self.discard_pile.append(card_to_discard)
+    def discard(self, card_index=-1):
+        if (len(self.get_current_player()['hand'])):
+            if card_index < 0:
+                card_ratings = []
+                combo_cards = []
+                combo_cards.extend(self.get_current_player()['hand'])
+                combo_cards.extend(self.discard_pile)
+                for i, n in enumerate(self.get_current_player()['hand']):
+                    same_card_num = len(list(filter(lambda x: x['card'] == n['card'] ,self.get_current_player()['hand'])))
+                    same_suite_one_card_away = len(list(filter(lambda x: x['suite'] == n['suite'] and (n['card'] == x['card'] + 1 or n['card'] == x['card'] - 1) ,combo_cards)))
+                    same_suite_two_cards_away = len(list(filter(lambda x: x['suite'] == n['suite'] and (n['card'] == x['card'] + 2 or n['card'] == x['card'] - 2) ,combo_cards)))
+                    card_rating = n['points'] + same_card_num + (same_suite_one_card_away * 2) + same_suite_two_cards_away
+                    card_ratings.append({ 'rating': card_rating, 'index': i })
+                card_ratings = list(sorted(card_ratings, key=lambda x: x['rating']))
+                print('card ratings')
+                print(card_ratings)
+                card_to_discard = self.get_current_player()['hand'].pop(card_ratings[0]['index'])
+                self.discard_pile.append(card_to_discard)
+            else:
+                card_to_discard = self.get_current_player()['hand'].pop(card_index)
+                self.discard_pile.append(card_to_discard)
+        else:
+            self.game_over = True
+            print('game over')
 
     def get_matchables(self, lst):
         return list(filter(lambda z: z['count'] >= self.match_min_length, map(lambda y: { 'card': y, 'count': len(list(filter(lambda x: x['card'] == y, lst ))) }, self.suites)))
@@ -198,6 +242,14 @@ class RummyGame (CardGame):
         if len(cards_for_set) >= self.match_min_length:
             set_index = len(self.sets)
             self.sets.append(list(map(lambda x: { 'card': x, 'player': player['name'], 'index': set_index } ,cards_for_set)))
+    
+    def add_card_to_set(self, card, set_index):
+        print('adding card to set')
+        card_to_add = card
+        card_in_hand = self.find_card(card_to_add, self.get_current_player()['hand'])
+        if card_in_hand:
+            removed_hand_card = self.get_current_player()['hand'].pop(card_in_hand['index'])
+            self.sets[set_index].append({'card': removed_hand_card, 'player': self.get_current_player()['name'], 'index': set_index})
 
     def draw_from_discard_pile(self, target_cards):
         discard_pile_with_indexes = []

@@ -3,6 +3,7 @@ import random
 class CardGame:
     def __init__(self, start_count, player_list=['computer', 'human'], suite_size=13, card_type_count=4, point_default=1, point_matrix={ }):
         self.hand_size = start_count
+        self.game_over = False
         self.turn_index = 0
         self.suites = tuple(range(1, suite_size + 1))
         self.types = tuple(range(1, card_type_count + 1))

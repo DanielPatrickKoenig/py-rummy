@@ -9,11 +9,10 @@ class RummyGame (CardGame):
         self.run_min_length = run_min_length
         self.discard_pile = []
         self.sets = []
+        self.seen_cards = []
     
     def turn_action(self):
         super().turn_action()
-
-        print('current player = ' + self.get_current_player()['name'])
 
         # pile_options = self.get_set_options(include_hand=False, include_pile=True)
         # if len(pile_options['options']) > 0:
@@ -24,6 +23,14 @@ class RummyGame (CardGame):
 
         # print('opportunities')
         # print(self.get_existing_set_opportunitie(include_pile=True))
+
+        cards_gone_missing = self.get_not_seen_cards()
+        cards_taken_by_other_players = cards_gone_missing['taken']
+        cards_never_seen = cards_gone_missing['never_seen']
+        print('cards taken by other players')
+        print(cards_taken_by_other_players)
+        print('cards never seen')
+        print(cards_never_seen)
 
         combo_options = self.get_set_options(include_hand=True, include_pile=True)
         combo_opps = self.get_existing_set_opportunitie(include_pile=True)
@@ -39,42 +46,29 @@ class RummyGame (CardGame):
             # print(first_card_picked_up)
 
         hand_after_combo = len(self.get_current_player()['hand'])
-        print(str(hand_after_combo) + ' cards')
         if (hand_before_combo == hand_after_combo):
             self.draw_card(self.get_current_player()) # only if there are no pile related options
 
         hand_options = self.get_set_options()
         hand_opps = self.get_existing_set_opportunitie()
-        print('hand options')
-        print(hand_options)
-        print('hand opps')
-        print(hand_opps)
         fcpu_options = []
         fcpu_opps = []
         if len(hand_options['options']) > 0 or len(hand_opps['opps']):
             if first_card_picked_up:
                 options_with_fcpu = list(map(lambda x: len(list(filter(lambda y: y['card'] == first_card_picked_up['card'] and y['suite'] == first_card_picked_up['suite'] ,x['cards']))) > 0 ,hand_options['options']))
                 if len(list(filter(lambda x: x ,options_with_fcpu))) > 0:
-                    print('options with fcpu')
-                    print(options_with_fcpu)
                     for i, n in enumerate(options_with_fcpu):
                         if n:
                             fcpu_options.append(hand_options['options'][i])
                     fcpu_options = list(reversed(list(sorted(fcpu_options, key=lambda x: x['point_totals']))))
-                    print('fcpu options')
-                    print(fcpu_options)
                     # flag first set
                 else:
                     opps_with_fcpu = list(map(lambda x: x['card']['card'] == first_card_picked_up['card'] and x['card']['suite'] == first_card_picked_up['suite'] ,hand_opps['opps']))
                     if len(list(filter(lambda x: x ,opps_with_fcpu))) > 0:
-                        print('opps with fcpu')
-                        print(opps_with_fcpu)
                         for i, n in enumerate(opps_with_fcpu):
                             if n:
                                 fcpu_options.append(hand_opps['opps'][i])
                         fcpu_opps = list(reversed(list(sorted(fcpu_opps, key=lambda x: x['point_totals']))))
-                        print('fcpu opps')
-                        print(fcpu_opps)
                         # flag first opp
             # process hand sets
             if len(fcpu_options) > 0:
@@ -107,8 +101,6 @@ class RummyGame (CardGame):
                     card_rating = n['points'] + same_card_num + (same_suite_one_card_away * 2) + same_suite_two_cards_away
                     card_ratings.append({ 'rating': card_rating, 'index': i })
                 card_ratings = list(sorted(card_ratings, key=lambda x: x['rating']))
-                print('card ratings')
-                print(card_ratings)
                 card_to_discard = self.get_current_player()['hand'].pop(card_ratings[0]['index'])
                 self.discard_pile.append(card_to_discard)
             else:
@@ -244,21 +236,42 @@ class RummyGame (CardGame):
             self.sets.append(list(map(lambda x: { 'card': x, 'player': player['name'], 'index': set_index } ,cards_for_set)))
     
     def add_card_to_set(self, card, set_index):
-        print('adding card to set')
         card_to_add = card
         card_in_hand = self.find_card(card_to_add, self.get_current_player()['hand'])
         if card_in_hand:
             removed_hand_card = self.get_current_player()['hand'].pop(card_in_hand['index'])
             self.sets[set_index].append({'card': removed_hand_card, 'player': self.get_current_player()['name'], 'index': set_index})
 
+    def get_not_seen_cards(self):
+        visible_cards = [n for n in self.discard_pile]
+        cards_in_sets = []
+        for n in self.sets:
+            card_in_set = [m['card'] for m in n]
+            cards_in_sets.extend(card_in_set)
+        # print('cards in sets')
+        # print(cards_in_sets)
+        visible_cards.extend(cards_in_sets)
+        visible_cards.extend(self.get_current_player()['hand'])
+        self.seen_cards.extend(visible_cards)
+        self.seen_cards = self.unique_card_list(self.seen_cards)
+        visible_cards = self.unique_card_list(visible_cards)
+        seen_cards_from_template = list(map(lambda x: { 'card': x, 'seen': len(list(filter(lambda y: y['card'] == x['card'] and y['suite'] == x['suite'], self.seen_cards))) > 0, 'seen_now': len(list(filter(lambda y: y['card'] == x['card'] and y['suite'] == x['suite'], visible_cards))) > 0 }, self.deck_template))
+        # print('seen cards from template')
+        # print(seen_cards_from_template)
+        cards_currently_missing = list(filter(lambda x: x['seen'] and not x['seen_now'], seen_cards_from_template))
+        cards_not_yet_seen = list(filter(lambda x: not x['seen'] and not x['seen_now'], seen_cards_from_template))
+        # print('cards currntly missing')
+        # print(cards_currently_missing)
+        cards_that_disapeared = list(map(lambda x: x['card'], cards_currently_missing))
+        cards_never_seen_by_player = list(map(lambda x: x['card'], cards_not_yet_seen))
+        return { 'taken': cards_that_disapeared, 'never_seen': cards_never_seen_by_player }
+    
     def draw_from_discard_pile(self, target_cards):
         discard_pile_with_indexes = []
         for i, n in enumerate(self.discard_pile):
             discard_pile_with_indexes.append({ 'card': n['card'], 'suite': n['suite'], 'index': i })
-        print('draw_from_discard_pile')
         filtered_indexed_discard_matches = list(filter(None, [self.find_card(n, target_cards) for n in discard_pile_with_indexes]))
         sorted_discard_matches = list(sorted(list(map(lambda x: x['index'], filtered_indexed_discard_matches))))
-        print(sorted_discard_matches)
 
         first_card_pulled = None
         if len(sorted_discard_matches) > 0:

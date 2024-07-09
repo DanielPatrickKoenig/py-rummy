@@ -15,6 +15,7 @@ class CardGame:
         for n in grd:
             self.deck.extend(n)
         self.deck = list(map(lambda x: { 'card': x['card'], 'suite': x['suite'], 'points': point_default if x['card'] not in point_matrix else point_matrix[x['card']] }, self.deck))
+        self.deck_template = [n for n in self.deck]
         random.shuffle(self.deck)
         self.deal()
 

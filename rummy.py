@@ -2,6 +2,9 @@ import rg
 
 game = rg.RummyGame(player_list=['computer', 'computer'])
 
+game.set_discard_rating_value('p0', card_point_factor=4)
+game.set_discard_rating_value('p1', card_point_factor=2.5)
+
 def player_turn():
     if game.get_current_player()['type'] == 'human':
         print('i am human')

@@ -1,4 +1,5 @@
 import cg
+from functools import reduce
 
 CardGame = cg.CardGame
 
@@ -10,7 +11,26 @@ class RummyGame (CardGame):
         self.discard_pile = []
         self.sets = []
         self.seen_cards = []
+        self.cards_taken_by_other_players = []
+        self.cards_never_seen = []
+        for n in self.players:
+            self.set_discard_rating_value(n['name'])
     
+    def set_discard_rating_value(self, player_name, card_point_factor=1, same_card_factor=1, same_suite_one_away_factor=1, same_suite_two_away_factor=1, same_card_num_other_players_factor=1, same_suite_one_card_away_other_players_factor=1, same_suite_two_cards_away_other_players_factor=1, same_card_num_never_seen_factor=1, same_suite_one_card_away_never_seen_factor=1, same_suite_two_cards_away_never_seen_factor=1):
+        indexed_players = [ { 'index': i, 'name': n['name'] } for i, n in enumerate(self.players)]
+        matching_players = list(filter(lambda x: x['name'] == player_name, indexed_players))
+        if len(matching_players) > 0:
+            self.players[matching_players[0]['index']]['card_point_factor'] = card_point_factor
+            self.players[matching_players[0]['index']]['same_card_factor'] = same_card_factor
+            self.players[matching_players[0]['index']]['same_suite_one_away_factor'] = same_suite_one_away_factor
+            self.players[matching_players[0]['index']]['same_suite_two_away_factor'] = same_suite_two_away_factor
+            self.players[matching_players[0]['index']]['same_card_num_other_players_factor'] = same_card_num_other_players_factor
+            self.players[matching_players[0]['index']]['same_suite_one_card_away_other_players_factor'] = same_suite_one_card_away_other_players_factor
+            self.players[matching_players[0]['index']]['same_suite_two_cards_away_other_players_factor'] = same_suite_two_cards_away_other_players_factor
+            self.players[matching_players[0]['index']]['same_card_num_never_seen_factor'] = same_card_num_never_seen_factor
+            self.players[matching_players[0]['index']]['same_suite_one_card_away_never_seen_factor'] = same_suite_one_card_away_never_seen_factor
+            self.players[matching_players[0]['index']]['same_suite_two_cards_away_never_seen_factor'] = same_suite_two_cards_away_never_seen_factor
+
     def turn_action(self):
         super().turn_action()
 
@@ -25,12 +45,12 @@ class RummyGame (CardGame):
         # print(self.get_existing_set_opportunitie(include_pile=True))
 
         cards_gone_missing = self.get_not_seen_cards()
-        cards_taken_by_other_players = cards_gone_missing['taken']
-        cards_never_seen = cards_gone_missing['never_seen']
+        self.cards_taken_by_other_players = cards_gone_missing['taken']
+        self.cards_never_seen = cards_gone_missing['never_seen']
         print('cards taken by other players')
-        print(cards_taken_by_other_players)
+        print(self.cards_taken_by_other_players)
         print('cards never seen')
-        print(cards_never_seen)
+        print(self.cards_never_seen)
 
         combo_options = self.get_set_options(include_hand=True, include_pile=True)
         combo_opps = self.get_existing_set_opportunitie(include_pile=True)
@@ -95,10 +115,28 @@ class RummyGame (CardGame):
                 combo_cards.extend(self.get_current_player()['hand'])
                 combo_cards.extend(self.discard_pile)
                 for i, n in enumerate(self.get_current_player()['hand']):
-                    same_card_num = len(list(filter(lambda x: x['card'] == n['card'] ,self.get_current_player()['hand'])))
-                    same_suite_one_card_away = len(list(filter(lambda x: x['suite'] == n['suite'] and (n['card'] == x['card'] + 1 or n['card'] == x['card'] - 1) ,combo_cards)))
-                    same_suite_two_cards_away = len(list(filter(lambda x: x['suite'] == n['suite'] and (n['card'] == x['card'] + 2 or n['card'] == x['card'] - 2) ,combo_cards)))
-                    card_rating = n['points'] + same_card_num + (same_suite_one_card_away * 2) + same_suite_two_cards_away
+                    same_card_num = len(list(filter(lambda x: x['card'] == n['card'], combo_cards)))
+                    same_suite_one_card_away = len(list(filter(lambda x: x['suite'] == n['suite'] and (n['card'] == x['card'] + 1 or n['card'] == x['card'] - 1), combo_cards)))
+                    same_suite_two_cards_away = len(list(filter(lambda x: x['suite'] == n['suite'] and (n['card'] == x['card'] + 2 or n['card'] == x['card'] - 2), combo_cards)))
+                    same_card_num_other_players = len(list(filter(lambda x: x['card'] == n['card'], self.cards_taken_by_other_players)))
+                    same_suite_one_card_away_other_players = len(list(filter(lambda x: x['suite'] == n['suite'] and (n['card'] == x['card'] + 1 or n['card'] == x['card'] - 1), self.cards_taken_by_other_players)))
+                    same_suite_two_cards_away_other_players = len(list(filter(lambda x: x['suite'] == n['suite'] and (n['card'] == x['card'] + 2 or n['card'] == x['card'] - 2), self.cards_taken_by_other_players)))
+                    same_card_num_never_seen = len(list(filter(lambda x: x['card'] == n['card'], self.cards_never_seen)))
+                    same_suite_one_card_away_never_seen = len(list(filter(lambda x: x['suite'] == n['suite'] and (n['card'] == x['card'] + 1 or n['card'] == x['card'] - 1), self.cards_never_seen)))
+                    same_suite_two_cards_away_never_seen = len(list(filter(lambda x: x['suite'] == n['suite'] and (n['card'] == x['card'] + 2 or n['card'] == x['card'] - 2), self.cards_never_seen)))
+                    rating_values = [
+                        n['points'] * self.get_current_player()['card_point_factor'],
+                        same_card_num * self.get_current_player()['same_card_factor'],
+                        same_suite_one_card_away * self.get_current_player()['same_suite_one_away_factor'],
+                        same_suite_two_cards_away * self.get_current_player()['same_suite_two_away_factor'],
+                        same_card_num_other_players * self.get_current_player()['same_card_num_other_players_factor'],
+                        same_suite_one_card_away_other_players * self.get_current_player()['same_suite_one_card_away_other_players_factor'],
+                        same_suite_two_cards_away_other_players * self.get_current_player()['same_suite_two_cards_away_other_players_factor'],
+                        same_card_num_never_seen * self.get_current_player()['same_card_num_never_seen_factor'],
+                        same_suite_one_card_away_never_seen * self.get_current_player()['same_suite_one_card_away_never_seen_factor'],
+                        same_suite_two_cards_away_never_seen * self.get_current_player()['same_suite_two_cards_away_never_seen_factor'],
+                    ]
+                    card_rating = reduce(lambda x, y: x + y, rating_values) 
                     card_ratings.append({ 'rating': card_rating, 'index': i })
                 card_ratings = list(sorted(card_ratings, key=lambda x: x['rating']))
                 card_to_discard = self.get_current_player()['hand'].pop(card_ratings[0]['index'])

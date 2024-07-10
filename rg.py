@@ -13,6 +13,7 @@ class RummyGame (CardGame):
         self.seen_cards = []
         self.cards_taken_by_other_players = []
         self.cards_never_seen = []
+        self.no_cards_left_count = 0
         for n in self.players:
             self.set_discard_rating_value(n['name'])
     
@@ -91,10 +92,10 @@ class RummyGame (CardGame):
                         fcpu_opps = list(reversed(list(sorted(fcpu_opps, key=lambda x: x['point_totals']))))
                         # flag first opp
             # process hand sets
-            if len(fcpu_options) > 0:
+            if len(fcpu_options) > 0 and 'cards' in fcpu_options[0].keys():
                 self.add_set(self.get_current_player(), fcpu_options[0]['cards'])
             
-            if len(fcpu_opps) > 0:
+            if len(fcpu_opps) > 0 and 'cards' in fcpu_opps[0].keys() and 'set' in fcpu_opps[0].keys():
                 self.add_card_to_set(fcpu_opps[0]['card'], fcpu_opps[0]['set'])
             
             for i, n in enumerate(hand_options['options']):
@@ -107,6 +108,48 @@ class RummyGame (CardGame):
 
         self.discard() # create logit to choose card to discard
     
+    def on_no_cards_in_deck(self):
+        self.no_cards_left_count += 1
+        if len(self.discard_pile) > 0:
+            reversed_discard_indexes = list(reversed([n for n in range(0, len(self.discard_pile))]))
+            for n in reversed_discard_indexes:
+                self.deck.append(self.discard_pile.pop(n))
+            self.shuffle_deck()
+        else:
+            self.game_over = True
+            self.get_winner()
+        if self.no_cards_left_count > 5:
+            self.game_over = True
+            self.get_winner()
+
+    def can_add_to_set(self):
+        set_counts = [0 for n in self.sets]
+        for i, n in enumerate(self.sets):
+            set_counts[i] = len(list(filter(lambda x: x['player'] == self.get_current_player()['name'], n)))
+        number_of_sets = len(list(filter(lambda x: x >= self.match_min_length, set_counts)))
+        print('number of sets')
+        print(number_of_sets)
+        return number_of_sets > 0
+
+    def get_winner(self):
+        player_points = { n['name']: 0 for n in self.players }
+        for n in self.players:
+            list_of_points_in_hand = list(map(lambda x: x['points'], n['hand']))
+            points_in_hand = 0
+            if len(list_of_points_in_hand) > 0:
+                points_in_hand = reduce(lambda x, y: x + y, list_of_points_in_hand)
+            point_values_in_sets = []
+            points_in_sets = 0
+            for m in self.sets:
+                filter_by_player = list(filter(lambda x: x['player'] == n['name'], m))
+                filtered_points = list(map(lambda x: x['card']['points'], filter_by_player))
+                point_values_in_sets.extend(filtered_points)
+            if len(point_values_in_sets) > 0:
+                points_in_sets = reduce(lambda x, y: x + y, point_values_in_sets)
+            player_points[n['name']] = points_in_sets - points_in_hand
+        print('player points')
+        print(player_points)
+
     def discard(self, card_index=-1):
         if (len(self.get_current_player()['hand'])):
             if card_index < 0:
@@ -146,6 +189,7 @@ class RummyGame (CardGame):
                 self.discard_pile.append(card_to_discard)
         else:
             self.game_over = True
+            self.get_winner()
             print('game over')
 
     def get_matchables(self, lst):
@@ -274,11 +318,12 @@ class RummyGame (CardGame):
             self.sets.append(list(map(lambda x: { 'card': x, 'player': player['name'], 'index': set_index } ,cards_for_set)))
     
     def add_card_to_set(self, card, set_index):
-        card_to_add = card
-        card_in_hand = self.find_card(card_to_add, self.get_current_player()['hand'])
-        if card_in_hand:
-            removed_hand_card = self.get_current_player()['hand'].pop(card_in_hand['index'])
-            self.sets[set_index].append({'card': removed_hand_card, 'player': self.get_current_player()['name'], 'index': set_index})
+        if self.can_add_to_set():
+            card_to_add = card
+            card_in_hand = self.find_card(card_to_add, self.get_current_player()['hand'])
+            if card_in_hand:
+                removed_hand_card = self.get_current_player()['hand'].pop(card_in_hand['index'])
+                self.sets[set_index].append({'card': removed_hand_card, 'player': self.get_current_player()['name'], 'index': set_index})
 
     def get_not_seen_cards(self):
         visible_cards = [n for n in self.discard_pile]

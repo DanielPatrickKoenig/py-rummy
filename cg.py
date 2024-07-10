@@ -16,14 +16,22 @@ class CardGame:
             self.deck.extend(n)
         self.deck = list(map(lambda x: { 'card': x['card'], 'suite': x['suite'], 'points': point_default if x['card'] not in point_matrix else point_matrix[x['card']] }, self.deck))
         self.deck_template = [n for n in self.deck]
-        random.shuffle(self.deck)
+        self.shuffle_deck()
         self.deal()
 
+    def shuffle_deck(self):
+        random.shuffle(self.deck)
+
     def draw_card(self, player):
-        removed_card = self.deck.pop(0)
-        player['hand'].append(removed_card)
-        return removed_card
-    
+        if len(self.deck) > 0:
+            removed_card = self.deck.pop(0)
+            player['hand'].append(removed_card)
+        else:
+            self.on_no_cards_in_deck()
+
+    def on_no_cards_in_deck(self):
+        print('no cards left')
+
     def add_player(self, type):
         self.players.append({ 'name': 'p' + str(len(self.players)), 'type': type, 'hand': [] })
 

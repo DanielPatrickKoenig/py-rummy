@@ -4,10 +4,10 @@ from functools import reduce
 CardGame = cg.CardGame
 
 class RummyGame (CardGame):
-    def __init__(self, player_list=['computer', 'human'], suite_size=13, card_type_count=4, match_min_length=3, run_min_length=3, point_matrix={ 13: 2, 12: 2, 11: 2, 10: 2, 1: 3 }):
+    def __init__(self, player_list=['computer', 'human'], suite_size=13, card_type_count=4, match_min_length=3, point_matrix={ 13: 2, 12: 2, 11: 2, 10: 2, 1: 3 }):
         CardGame.__init__(self, 7, player_list, suite_size, card_type_count, point_matrix=point_matrix)
         self.match_min_length = match_min_length
-        self.run_min_length = run_min_length
+        self.run_min_length = match_min_length
         self.discard_pile = []
         self.sets = []
         self.seen_cards = []
